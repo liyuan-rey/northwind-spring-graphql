@@ -1,4 +1,4 @@
-# Northwind Spring GraphQL Data Service Application
+# Northwind Spring GraphQL Data Service
 
 本项目实现了一个数据访问服务，能让客户端通过 GraphQL 来灵活的查询数据库数据。
 
@@ -10,7 +10,7 @@
 
   [Java 11 OpenJDK](https://adoptium.net/)
 
-  配置为[阿里云 Maven 镜像](https://developer.aliyun.com/mirror/maven)。
+  配置镜像为 [阿里云 Maven 镜像](https://developer.aliyun.com/mirror/maven)。
 
 * IDE
 
@@ -27,7 +27,12 @@
   * "Git for Windows"，除了 Git 本身，还大量使用了其中的 'Git Bash'。
   * "Spring Boot CLI"，通过 'SDKMAN' 在 'Git Bash' 中安装。
 
-更详细的开发环境配置请参考 [这里]()
+更详细的开发环境配置请参考 [这里](...)
+
+> 注意：
+> 本文的命令行均采用 `bash` shell。
+> Windows 中可以利用 "Git for Windows" 的 "Git Bash" 运行，或者利用 WSL 环境做开发。
+> Linux 中可以直接在控制台运行。
 
 ## 实现基本的 Spring Boot JPA 数据服务
 
@@ -47,4 +52,36 @@ spring init \
   -j 11 \
   -d h2,data-jpa,web,lombok \
   northwind-spring-graphql/data-service
+```
+
+调整 Spring Web 应用程序配置文件为 YAML 格式。
+
+```shell
+cd northwind-spring-graphql/data-service/src/main/resources
+mv application.properties application.yaml
+```
+
+调整 build.gradle 构建文件，改用 Lombok 官方推荐的插件形式：[The Lombok Gradle Plugin](https://projectlombok.org/setup/gradle)
+
+添加如下配置代码
+
+```gradle
+plugins {
+  id "io.freefair.lombok" version "6.2.0"
+}
+```
+
+删除如下配置代码
+
+```diff
+- configurations {
+-     compileOnly {
+-         extendsFrom annotationProcessor
+-     }
+- }
+
+dependencies {
+-   compileOnly 'org.projectlombok:lombok'
+-   annotationProcessor 'org.projectlombok:lombok'
+}
 ```
