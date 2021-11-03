@@ -126,21 +126,370 @@ spring:
 
 ![h2 console](./docs/h2-console-login.png)
 
-我们再添加一些设置，Spring Data JPA 会利用这些设置自动创建名为 `h2-northwind` 的空数据库。
-
-注意这里使用了 H2 的 `内存数据库` 模式，主要是为了示例应用运行比较方便。
+再添加一些设置，Spring Data JPA 会利用这些设置自动创建名为 `h2-northwind` 的空数据库。
 
 ```yaml
 spring:
   datasource:
     driverClassName: org.h2.Driver
-    url: jdbc:h2:mem:h2-northwind
+    url: jdbc:h2:mem:h2-northwind;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
     username: sa
     password: mypass
   jpa:
     database-platform: org.hibernate.dialect.H2Dialect
 ```
 
+注意这里使用了 H2 的 `内存数据库` 模式，主要是为了本示例应用调试更方便。生产环境中一般会使用数据文件如 `jdbc:h2:file:/data/testdb`。
+
 此时访问 http://localhost:9000/h2-console/ 就可以正常登入 `h2-northwind` 数据库了。
 
 ![h2 console](./docs/h2-console.png)
+
+注意 `spring.datasource.url` 取值中有两个特别的配置：
+* `DB_CLOSE_DELAY=-1` 参考 http://www.h2database.com/html/features.html#in_memory_databases
+* `DB_CLOSE_ON_EXIT=FALSE` 参考 https://docs.spring.io/spring-boot/docs/current/reference/html/features.html#features.sql.datasource.embedded
+
+### 创建 Entity 和 Repository
+
+接下来采用 `Code First` 的方式来为 Spring Data JPA 应用添加数据库访问能力。
+
+假已经预先设计好了 Northwind 应用的领域对象及相应的数据库数据架构：
+
+![ER](./docs/ER.png)
+
+> 感谢 [pthom](https://github.com/pthom) 和他的 [项目](https://github.com/pthom/northwind_psql)。
+
+根据上述架构先添加 category, product, supplier 这三个 Entity 以及对应的 Repository。
+
+下面是关键代码片段，完整代码请参考代码库源代码。
+
+```java
+// Supplier.java
+
+@Entity
+@Data
+public class Supplier {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(nullable = false)
+    private Long id;
+
+    @Column(length = 40, nullable = false)
+    private String companyName;
+
+    @Column(length = 30)
+    private String contactName;
+
+    //...
+}
+```
+
+```java
+// Category.java
+
+@Entity
+@Data
+public class Category {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(nullable = false)
+    private Long id;
+
+    @Column(length = 15, nullable = false)
+    private String name;
+
+    private Clob description;
+
+    private Blob picture;
+}
+```
+
+```java
+// Product.java
+
+@Entity
+@Data
+public class Product {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(nullable = false)
+    private Long id;
+
+    @Column(length = 40)
+    private String name;
+
+    @ManyToOne
+    private Supplier supplier;
+
+    @ManyToOne
+    private Category category;
+
+    @Column(length = 20)
+    private String quantityPerUnit;
+
+    private BigDecimal unitPrice;
+
+    private Integer unitsInStock;
+
+    private Integer unitsOnOrder;
+
+    private Integer reorderLevel;
+
+    @Column(nullable = false)
+    private Integer discontinued;
+}
+```
+
+代码中可以看到这几点：
+
+* 使用了 Lombok `@Data` 注解来辅助补充实现 Entity 类。如果觉得编译时 "嵌入" Lombok 自动生成的代码对开发/调试不直观，可以使用 "The Lombok Gradle Plugin" 的 `delombok` 构建任务来生成完整代码。
+* 主键字段采用 `Long` 而非 `long` 或者 `Integer`。
+  * 虽然 `long` 占用空间更小，但直接使用 `Long` 减少了访问 Entity 对象传参时的 `boxing/unboxing` 操作。
+  * 上述 Entity 采用了自增长主键注解 `@GeneratedValue(strategy = GenerationType.IDENTITY)`，因此 `Long` 更符合常规数据库自增长主键的物理数据类型 `BIGINT`。
+  * 更多主键自动生成或自定义策略可以参考 [这里](https://blog.csdn.net/u011781521/article/details/72210980) 和 [这里](https://blog.csdn.net/coding1994/article/details/79597057)
+* 采用 `java.sql.Clob` 类型来映射较长的文本 `Category.description`。
+* 采用 `java.sql.Blob` 类型来映射二进制数据内容如图片 `Category.picture`。
+* 采用 `java.math.BigDecimal` 类型来映射货币值，因为 `Float` 和 `Double` 类型都有四舍五入引起的精度问题。
+* 利用 `@Column` 注解定义了字段的常规约束。
+
+实体类 `Product` 与 `Supplier`、`Category` 分别具有多对一关系，并且本程序只需要 `Product` 为起始的单向关系，所以只在 `Product` 中定义了 `@ManyToOne` 的映射注解，而并没有在 `Supplier` `Category` 中定义 `@OneToMany` 的字段映射注解。更多的实体关系注解的示例可以参考 [这里](https://www.w3cschool.cn/java/jpa-onetomany-map.html)。
+
+在 `application.yaml` 中增加一些配置，指示 Spring Boot JPA 创建相关的数据库结构。更多说明请参考 [这里](https://docs.spring.io/spring-boot/docs/current/reference/html/howto.html#howto.data-initialization)
+
+```yaml
+spring:
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    show-sql: true
+    generate-ddl: false
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        "[format_sql]": true
+        "[globally_quoted_identifiers]": false
+```
+
+其中：
+
+* `database-platform` 大多数时候可以由 Spring Data JPA 自动从 `spring.datasource.url` 连接字符串中推断出来，可以不用写明。这里写明了 H2 数据库的配置值以作为示例。
+* `show-sql` 指示 JPA 运行时输出相关 SQL 语句。
+* `generate-ddl` 和 `ddl-auto` 都能控制是否由代码推断来创建表结构，前者是 JPA 自身特性而与具体实现无关，后者是 JPA 的 Hibernate 实现的专有特性，两者应只选其一以避免混淆。`ddl-auto` 取值更灵活，有若干不同的表结构创建策略，这取值 `create-drop` 使得每次运行都 drop 已有表并重新 create 表结构，更多取值和作用可以参考 [这里](https://www.cnblogs.com/qingmuchuanqi48/p/11616145.html)。
+* `spring.jpa.properties` 下保存了 Spring Data JPA 透传给底层 JPA 提供程序的参数，比如这里配置的 Hibernate 的参数信息，必须严格遵守 Hibernate 的要求，详细内容可以参考 [这里](https://docs.jboss.org/hibernate/core/3.6/reference/en-US/html/session-configuration.html#configuration-optional)。
+  * `"[format_sql]": true` 使 `show_sql` 展示格式化后的 SQL 语句。
+  * `"[globally_quoted_identifiers]": false` 使生成数据库 DDL 语句时不要使用引号来强制表名、字段名等大小写精确匹配。
+
+运行示例程序，会看到控制台输出了类似这样的 SQL 语句日志。
+
+```plain
+Hibernate: 
+    
+    drop table if exists category CASCADE 
+<...>
+Hibernate: 
+    
+    create table category (
+       id bigint generated by default as identity,
+        description clob,
+        name varchar(15) not null,
+        picture blob,
+        primary key (id)
+    )
+<...>
+Hibernate: 
+    
+    alter table product 
+       add constraint FK1mtsbur82frn64de7balymq9s 
+       foreign key (category_id) 
+       references category
+```
+
+此外，需要注意从实体产生数据库表映射时，采用的命名策略，策略实现类决定了比如 Entity 字段名 `quantityPerUnit` 映射到数据库时，会对应表字段名为 `quantityPerUnit` 还是 `quantity_per_unit`。
+
+如果没有明确指定，Spring Boot 应用的默认配置是：
+
+```yaml
+spring:
+  jpa:
+    hibernate:
+      naming:
+        physical-strategy: org.springframework.boot.orm.jpa.hibernate.SpringPhysicalNamingStrategy
+        implicit-strategy: org.springframework.boot.orm.jpa.hibernate.SpringImplicitNamingStrategy
+```
+
+`SpringPhysicalNamingStrategy` 策略会：
+
+* Replace dots with underscores
+* Change camel case to snake case, and
+* Lower-case table names
+
+更多信息请参考 [这里](https://docs.spring.io/spring-boot/docs/current/reference/html/howto.html#howto.data-access.configure-hibernate-naming-strategy)。
+
+接下来继续添加相关的 Repository。在 Spring Boot JPA 支持下，只需要简单的定义接口并扩展接口 `JpaRepository`，就能得到常规的数据 CRUD 的功能。
+
+```java
+// SupplierRepository.java
+
+public interface SupplierRepository extends JpaRepository<Supplier, Long> {
+
+}
+```
+
+```java
+// CategoryRepository.java
+
+public interface CategoryRepository extends JpaRepository<Category, Long> {
+
+}
+```
+
+```java
+// ProductRepository.java
+
+public interface ProductRepository extends JpaRepository<Product, Long> {
+
+}
+```
+
+为 DataServiceApplication 增加一些代码，快速验证一下 Repository 的功能。
+
+这里使用了 Spring Boot 的特性：被标记为 `@Bean` 并返回 `CommandLineRunner` 的方法会在应用启动完毕后立即运行。
+
+```java
+// DataServiceApplication.java
+
+// ...
+
+private static final Logger log = LoggerFactory.getLogger(DataServiceApplication.class);
+
+@Bean
+CommandLineRunner testRepository(ProductRepository pr) {
+
+    return args -> {
+
+        log.info("--- Test ProductRepository ---");
+
+        log.info("product count: {}", pr.count());
+
+        Product product = new Product();
+        product.setName("new-product");
+        product.setDiscontinued(0);
+
+        product = pr.save(product);
+        log.info("create new product, id: {}, name: {}", product.getId(), product.getName());
+
+        product.setName("test-product");
+        product = pr.save(product);
+
+        log.info("update product's name with: {}, id: {}", product.getName(), product.getId());
+
+        log.info("product found in db: {}", pr.findById(product.getId()).isPresent());
+
+        pr.delete(product);
+        log.info("product removed, now count: {}", pr.count());
+
+        log.info("------");
+
+    };
+}
+
+// ...
+```
+
+至此我们已经完成了简单的 Spring Boot JPA 数据服务。
+
+## 改进数据库初始化方式
+
+如果不想基于 Entity 类型来创建数据库结构，而是通过数据库初始化脚本来初始化，可以采用这样的配置：
+
+```yaml
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  sql:
+    init:
+      mode: always
+      encoding: utf8
+      schema-locations: classpath:db/schema-h2.sql
+      data-locations: classpath:db/data-h2.sql
+```
+
+其中：
+
+* `ddl-auto: validate` 配置 JPA Hibernate 不创建数据库结构，但需要验证数据库结构。这里取值为 `validate` 或 `none` 以避免和 `spring.sql.init` 配置的 SQL 脚本冲突。
+* `mode: always` 配置初始化模式，默认值是 `embedded` 表示只有使用嵌入式数据库时（如 H2）才执行初始化 SQL 脚本，这里 `always` 表示总是执行初始化。
+* `encoding: utf8` 配置 SQL 脚本文件内容编码。
+* `schema-locations: classpath:db/schema-h2.sql` 配置初始化数据库结构的脚本，这里也即项目基目录下的 `src/main/resources/db/schema-h2.sql` 文件，可以使用 `file:` 替换 `classpath` 来指定。
+* `data-locations: classpath:db/data-h2.sql` 配置写入数据库表初始数据的脚本。
+
+SQL 脚本内容可以参见源代码。
+
+更多信息可以参考：
+
+* https://docs.spring.io/spring-boot/docs/current/reference/html/howto.html#howto.data-initialization.using-basic-sql-scripts
+* https://docs.spring.io/spring-boot/docs/current/reference/html/application-properties.html#application-properties.data-migration.spring.sql.init.continue-on-error
+* https://stackoverflow.com/questions/38040572/spring-boot-loading-initial-data
+* https://www.codejava.net/frameworks/spring-boot/junit-tests-for-spring-data-jpa
+
+Spring Boot 官方文档推荐，生产环境里更多会采用  [flyway](https://flywaydb.org/) 或者 [liquibase](https://www.liquibase.org/) 来提供更强大的数据库初始化/迁移能力，他们都能和 Spring 紧密集成，可以参考 [这里](https://docs.spring.io/spring-boot/docs/current/reference/html/howto.html#howto.data-initialization.migration-tool)
+
+## 改进功能验证方式，添加单元测试
+
+上文通过 `CommandLineRunner` 来辅助检查 Repository 功能，作为 demo 演示可以，但在正式项目中更合适的方式莫过于通过单元测试来达成目的。
+
+在 Spring Boot CLI 创建的基础工程中，单元测试常用的框架 JUnit Jupiter 是开箱即用的，与 `CommandLineRunner` 版验证代码对齐的单元测试可以参考下面的内容。
+
+```java
+// ProductRepositoryTest.java
+
+@DataJpaTest
+public class ProductRepositoryTest {
+    @Autowired
+    private ProductRepository pr;
+
+    @Test
+    void testSimpleCRUD() {
+
+        final long count = pr.count();
+
+        Product product = assertDoesNotThrow(() -> {
+            Product p = new Product();
+            p.setName("new-product");
+            p.setDiscontinued(0);
+            return pr.save(p);
+        });
+        final Long id = product.getId();
+        assertTrue(id > 0);
+
+        final String name = "test-product";
+        product = assertDoesNotThrow(() -> {
+            Product p = new Product();
+            p.setId(id);
+            p.setName(name);
+            return pr.save(p);
+        });
+        assertEquals(id, product.getId());
+        assertEquals(name, product.getName());
+
+        Optional<Product> tmp = assertDoesNotThrow(() -> pr.findById(id));
+        assertTrue(tmp.isPresent());
+
+        assertDoesNotThrow(() -> {
+            Product p = new Product();
+            p.setId(id);
+            pr.delete(p);
+        });
+        assertEquals(count, pr.count());
+    }
+}
+```
+
+更多关于 Spring Data JPA 单元测试相关的内容可以参考：
+
+* https://reflectoring.io/spring-boot-data-jpa-test/
+* https://reflectoring.io/spring-boot-test/
+* https://www.codejava.net/frameworks/spring-boot/junit-tests-for-spring-data-jpa
