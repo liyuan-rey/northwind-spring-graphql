@@ -3,11 +3,27 @@ type Query {
 
   products: [Product]
   product(id: ID!): Product
+
+  categories: [Category]
+  category(id: ID!): Category
+
+  suppliers: [Supplier]
+  Supplier(id: ID!): Supplier
 }
 
 type Product {
   id: ID!
   name: String!
+}
+
+type Category {
+  id: ID!
+  name: String!
+}
+
+type Supplier {
+  id: ID!
+  companyName: String!
 }
 
 type Mutation {

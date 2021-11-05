@@ -11,7 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 
 @DataJpaTest
-public class ProductRepositoryTest {
+public class ProductRepositoryJpaTests {
     @Autowired
     private ProductRepository pr;
 
