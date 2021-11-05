@@ -22,8 +22,8 @@ spring:
     hibernate:
       ddl-auto: validate
       # naming:
-        # physical-strategy: org.springframework.boot.orm.jpa.hibernate.SpringPhysicalNamingStrategy
-        # implicit-strategy: org.springframework.boot.orm.jpa.hibernate.SpringImplicitNamingStrategy
+      # physical-strategy: org.springframework.boot.orm.jpa.hibernate.SpringPhysicalNamingStrategy
+      # implicit-strategy: org.springframework.boot.orm.jpa.hibernate.SpringImplicitNamingStrategy
     properties:
       hibernate:
         "[format_sql]": true
@@ -35,3 +35,13 @@ spring:
       encoding: utf8
       schema-locations: classpath:db/schema-h2.sql
       # data-locations: classpath:db/data-h2.sql
+  graphql:
+    path: /graphql
+    schema:
+      locations: classpath:graphql/
+      fileExtensions: .graphqls, .gqls
+      printer:
+        enabled: false
+    graphiql:
+      enabled: true
+      path: /graphiql

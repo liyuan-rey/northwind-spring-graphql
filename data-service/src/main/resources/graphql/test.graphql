@@ -1,0 +1,37 @@
+query q {
+  greeting
+  product(id: 1) {
+    id
+    name
+    category {
+      id
+      name
+    }
+    supplier {
+      id
+      companyName
+    }
+    discontinued
+  }
+  categories {
+    id
+    name
+    products {
+      id
+      name
+      supplier {
+        id
+        companyName
+      }
+      discontinued
+    }
+  }
+}
+
+mutation m {
+  addProduct(input: { name: "ly03", discontinued: "discontinued" }) {
+    id
+    name
+    discontinued
+  }
+}

@@ -1,0 +1,21 @@
+type Query {
+  greetings: String
+
+  products: [Product]
+  product(id: ID!): Product
+}
+
+type Product {
+  id: ID!
+  name: String!
+}
+
+type Mutation {
+  addProduct(input: ProductInput!): Product
+}
+
+input ProductInput {
+  id: ID!
+  name: String!
+  discontinued: Int!
+}

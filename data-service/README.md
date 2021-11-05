@@ -56,7 +56,14 @@ spring init \
   northwind-spring-graphql/data-service
 ```
 
-调整 Spring Web 应用程序配置文件为 YAML 格式。
+注意我们引入了这些依赖：
+
+* H2 Database
+* Spring Data JPA
+* Lombok
+* Spring Web
+
+然后调整 Spring Web 应用程序配置文件为 YAML 格式。
 
 ```shell
 # $ pwd
@@ -146,6 +153,7 @@ spring:
 ![h2 console](./docs/h2-console.png)
 
 注意 `spring.datasource.url` 取值中有两个特别的配置：
+
 * `DB_CLOSE_DELAY=-1` 参考 http://www.h2database.com/html/features.html#in_memory_databases
 * `DB_CLOSE_ON_EXIT=FALSE` 参考 https://docs.spring.io/spring-boot/docs/current/reference/html/features.html#features.sql.datasource.embedded
 
@@ -493,3 +501,124 @@ public class ProductRepositoryTest {
 * https://reflectoring.io/spring-boot-data-jpa-test/
 * https://reflectoring.io/spring-boot-test/
 * https://www.codejava.net/frameworks/spring-boot/junit-tests-for-spring-data-jpa
+
+### Spring Data JPA 的更进一步
+
+上面实现的 JPA 数据服务，实际并未暴露给外部，如果想进一步将 Spring Data JPA 通过 RESTful 接口暴露出来，可以参考：
+
+* [Spring Data REST](https://spring.io/projects/spring-data-rest)
+* [Spring HATEOAS](https://spring.io/projects/spring-hateoas)
+
+## 基于 JPA 和 Spring GraphQL 实现 GraphQL 数据服务
+
+接下来我们在 JPA 数据服务基础上，通过 HTTP 协议提供 GraphQL 接口给外部使用。
+
+### Spring GraphQL Boot starter
+
+Spring GraphQL 作为 Spring Boot 的一项功能特性，同样提供了 `Spring GraphQL Boot Starter` 来帮助快速实现 GraphQL 接口。
+
+我们需要添加相关依赖：
+
+```gradle
+repositories {
+    // Spring milestones
+    maven { url 'https://repo.spring.io/milestone' }
+}
+
+dependencies {
+    // Spring GraphQL Boot starter
+    implementation 'org.springframework.experimental:graphql-spring-boot-starter:1.0.0-M3'
+
+    // Spring GraphQL test
+    testImplementation 'org.springframework.graphql:spring-graphql-test:1.0.0-M3'
+    testImplementation 'org.springframework:spring-webflux'
+}
+```
+
+注意：
+
+* 在 Spring Boot 2.7 发布时，Spring GraphQL 的 group id 将会从 `org.springframework.experimental` 调整为 `org.springframework.boot`。
+* 本项目编写时 Spring GraphQL 较稳定版本为 `1.0.0-M3`，需要从 Spring 的 maven 仓库中 `milestone` 分支获取。
+* 尽管本项目没有使用 webflux 但因为 Spring GraphQL Test 组件的需要，仍然单独引入了测试依赖 'org.springframework:spring-webflux'。如果项目使用了 Spring WebFlux 技术并引入了 `spring-boot-starter-webflux` 就不需要单独加这个依赖了。
+
+Spring GraphQL 通过 [Querydsl](https://querydsl.com/) 来达成更优雅的查询灵活性，因此也需要加入相关依赖：
+
+```gradle
+dependencies {
+
+    implementation 'com.querydsl:querydsl-jpa:4.4.0'
+
+    annotationProcessor 'com.querydsl:querydsl-apt:4.4.0:jpa',
+      'javax.annotation:javax.annotation-api'
+}
+```
+
+为 Repository 类增加 Querydsl JPA 支持，补充扩展 `QuerydslPredicateExecutor` 接口。
+
+这里只列举了 `ProductRepository` 类代码，`CategoryRepository` 和 `SupplierRepository` 也应做同样修改。
+
+```java
+// ProductRepository.java
+
+@GraphQlRepository
+public interface ProductRepository extends JpaRepository<Product, Long>, QuerydslPredicateExecutor<Product> {
+
+}
+```
+
+扩展了 `QuerydslPredicateExecutor` 接口并具备 `@GraphQlRepository` 注解的 Spring Data Repository 类，会被 Spring GraphQL Boot Starter 自动注册为相应顶级 GraphQL 查询的 `DataFetcher` 实现，只需要 GraphQL 查询返回的类型名与 Repository 对应的实体类名相匹配即可。当然，也可以通过 `@GraphQlRepository` 的 `typeName` 参数明确指定要对应的 GraphQL 类型名。
+
+最终的效果是下面这个 GraphQL 查询会调用 ProductRepository 来实现，但却不需要我们自己编写相关代码。
+
+```graphql
+query {
+  products {
+    id,
+    name
+  }
+}
+```
+
+为了达到这一点，还需要做一些补充工作。
+
+为 Spring GraphQL 添加相关配置项：
+
+> 注意：`graphql` 与 `graphiql` 是不同的，前者是 GraphQL 服务本身，后者是测试 GraphQL 服务的页面工具。
+
+```yaml
+spring:
+  graphql:
+    path: /graphql
+    schema:
+      locations: classpath:graphql/
+      fileExtensions: .graphqls, .gqls
+      printer:
+        enabled: false
+    graphiql:
+      enabled: true
+      path: /graphiql
+```
+
+其中：
+
+* `graphql.path: /graphql` 指明了 GraphQL 服务发布路径。
+* `schema.locations` 和 `schema.fileExtensions` 配置了到哪里寻找 GraphQL 服务公开的查询所遵循的 GraphQL Schema 描述文件。
+* `graphiql` 相关配置启用了内置的 Graph*i*QL 调试工具页面，并发布在 `/graphiql` 路径，这样我们就可以通过 `http://localhost:9000/graphiql` 地址来使用这个工具了。
+
+再添加一个简单的 GraphQL Schema 文件。根据上面的配置，文件放在这里 `src/main/resources/graphql/schema.graphqls`：
+
+```graphql
+type Query {
+  products: [Product]
+  product(id: ID!): Product
+}
+
+type Product {
+  id: ID!
+  name: String!
+}
+```
+
+现在运行程序，访问 url `http://localhost:9000/graphiql`，就可以做 GraphQL 查询了。
+
+![graphiql-product-query](./docs/graphiql-product-query.png)
