@@ -1,19 +1,126 @@
-type Query {
+schema {
+  query: Query #QueryRootType
+  mutation: Mutation #MutationRootType
+}
+
+type Query { #QueryRootType {
+  # simple testing query
+
   greetings: String
+
+  # Category
+
+  # auto-mapping query
+
+  findById(id: ID!): Category
+  existsById(id: ID!): Boolean
+  getById(id: ID!): Category
+
+  findAll: [Category]
+  # todo: fix runtime error
+  findAllById(ids: [ID]!): [Category]
+  # todo: fix return null
+  count: Int
+
+  # derived query
+
+  categories: [Category]
+  category(id: ID!): Category
+  # todo: fix OrderBy no effect
+  findByNameOrderByNameDesc(name: String!): [Category]
+
+  # todo: find a way cascading define schema, something like 'subscription'
+  # https://www.apollographql.com/docs/apollo-server/schema/schema/#the-subscription-type
+  # and https://justtech.blog/2018/07/24/graphql-with-spring-query-and-pagination/
+  categoryQuery: CategoryQuery
+
+  # Product
 
   products: [Product]
   product(id: ID!): Product
+  findAllProductsById(ids: [ID!]!): [Product]
+  findAllProductsByName(name: String!): [Product]
+  # todo: fix Like no effect
+  findAllProductsByNameLike(name: String!): [Product]
+  # todo: fix runtime error: Double can't convert to String
+  findAllProductsByUnitPrice(unitPrice: Float!): [Product]
+  findAllProductsByUnitPriceLessThan(unitPrice: Float!): [Product]
+  # 根据 category id 查询匹配的 Product，仅返回查到的第一条，未查到返回 null
+  findProductByCategoryId(categoryId: ID!): Product
+  # 根据 category id 查询匹配的所有 Product，未查到会返回长度为 0 的数组
+  findAllProductsByCategoryId(categoryId: ID!): [Product]
+  # todo: fix return null
+  countProductByCategoryId(categoryId: ID!): Int
+
+  # custom
+  findProductByName(name: String!): Product
+  myFindProductByName(name: String!): ProductResponse
+
+  # Supplier
+
+  suppliers: [Supplier]
+  Supplier(id: ID!): Supplier
+  findSupplierByCompanyName(companyName: String!): Supplier
+  findAllSuppliersByCompanyName(companyName: String!): [Supplier]
+  # todo: figure out why act like suppliers, but is not expect
+  findAllSuppliersByProductId(productId: ID!): [Supplier]
+}
+
+type CategoryQuery {
+  findById(id: ID!): Category
+  existsById(id: ID!): Boolean
+  getById(id: ID!): Category!
+
+  findAll: [Category]!
+  findAllById(ids: [ID]!): [Category]! #todo
+  count: Int
 
   categories: [Category]
   category(id: ID!): Category
 
-  suppliers: [Supplier]
-  Supplier(id: ID!): Supplier
+  findByNameOrderByNameDesc(name: String!): [Category]
+}
+
+type Mutation { #MutationRootType {
+  addProduct(input: ProductInput!): Product
+  updateProductUnitPrice(id: ID!, unitPrice: Float!): Product
 }
 
 type Product {
   id: ID!
   name: String!
+  categoryId: String
+  unitPrice: Float
+  discontinued: Int!
+}
+
+type ProductResponse {
+  id: ID!
+  name: String!
+  categoryId: ID
+  reorderLevel: Int
+}
+
+type Sort {
+  orders: [Order]!
+}
+
+type Order {
+  direction: Direction
+  property: String
+  ignoreCase: Boolean
+  nullHandling: NullHandling
+}
+
+enum Direction {
+  ASC
+  DESC
+}
+
+enum NullHandling {
+  NATIVE
+  NULLS_FIRST
+  NULLS_LAST
 }
 
 type Category {
@@ -26,12 +133,7 @@ type Supplier {
   companyName: String!
 }
 
-type Mutation {
-  addProduct(input: ProductInput!): Product
-}
-
 input ProductInput {
-  id: ID!
   name: String!
   discontinued: Int!
 }

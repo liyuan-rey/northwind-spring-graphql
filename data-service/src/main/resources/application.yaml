@@ -19,6 +19,7 @@ spring:
     database-platform: org.hibernate.dialect.H2Dialect
     show-sql: true
     generate-ddl: false
+    open-in-view: false
     hibernate:
       ddl-auto: validate
       # naming:

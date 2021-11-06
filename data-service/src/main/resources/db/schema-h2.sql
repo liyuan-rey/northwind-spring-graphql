@@ -248,4 +248,4 @@ ALTER TABLE product
 --
 
 ALTER TABLE product
-    ADD CONSTRAINT fk_products_supplier FOREIGN KEY (supplier_id) REFERENCES supplier;
+    ADD CONSTRAINT fk_product_supplier FOREIGN KEY (supplier_id) REFERENCES supplier;

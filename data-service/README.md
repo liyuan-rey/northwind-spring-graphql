@@ -229,10 +229,20 @@ public class Product {
     @Column(length = 40)
     private String name;
 
-    @ManyToOne
+    @Column(name = "supplier_id")
+    private Long supplierId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "supplier_id", insertable = false, updatable = false)
+    @JsonIgnore
     private Supplier supplier;
 
-    @ManyToOne
+    @Column(name = "category_id")
+    private Long categoryId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "category_id", insertable = false, updatable = false)
+    @JsonIgnore
     private Category category;
 
     @Column(length = 20)
@@ -263,9 +273,9 @@ public class Product {
 * 采用 `java.math.BigDecimal` 类型来映射货币值，因为 `Float` 和 `Double` 类型都有四舍五入引起的精度问题。
 * 利用 `@Column` 注解定义了字段的常规约束。
 
-实体类 `Product` 与 `Supplier`、`Category` 分别具有多对一关系，并且本程序只需要 `Product` 为起始的单向关系，所以只在 `Product` 中定义了 `@ManyToOne` 的映射注解，而并没有在 `Supplier` `Category` 中定义 `@OneToMany` 的字段映射注解。更多的实体关系注解的示例可以参考 [这里](https://www.w3cschool.cn/java/jpa-onetomany-map.html)。
+实体类 `Product` 与 `Supplier`、`Category` 分别具有多对一关系，并且本程序只需要 `Product` 为起始的单向关系，所以只在 `Product` 中定义了 `@ManyToOne` 的映射注解，而并没有在 `Supplier` `Category` 中定义 `@OneToMany` 的字段映射注解。更多的实体关系注解的示例可以参考 [这里](https://www.w3cschool.cn/java/jpa-onetomany-map.html)。为了避免将返回 Product 数据结果时，递归性的将导航属性也加载回来，使用了 `@JsonIgnore` 注解来避免这一点。
 
-在 `application.yaml` 中增加一些配置，指示 Spring Boot JPA 创建相关的数据库结构。更多说明请参考 [这里](https://docs.spring.io/spring-boot/docs/current/reference/html/howto.html#howto.data-initialization)
+接下来，在 `application.yaml` 中增加一些配置，指示 Spring Boot JPA 创建相关的数据库结构。更多说明请参考 [这里](https://docs.spring.io/spring-boot/docs/current/reference/html/howto.html#howto.data-initialization)
 
 ```yaml
 spring:
@@ -605,7 +615,14 @@ spring:
 * `schema.locations` 和 `schema.fileExtensions` 配置了到哪里寻找 GraphQL 服务公开的查询所遵循的 GraphQL Schema 描述文件。
 * `graphiql` 相关配置启用了内置的 Graph*i*QL 调试工具页面，并发布在 `/graphiql` 路径，这样我们就可以通过 `http://localhost:9000/graphiql` 地址来使用这个工具了。
 
-再添加一个简单的 GraphQL Schema 文件。根据上面的配置，文件放在这里 `src/main/resources/graphql/schema.graphqls`：
+再添加一个简单的 GraphQL Schema 文件。
+
+> GraphQL Schema 的详细说明请参考：
+>
+> * https://graphql.org/learn/schema/
+> * https://www.apollographql.com/docs/apollo-server/schema/schema/
+
+根据上面的配置，文件放在这里 `src/main/resources/graphql/schema.graphqls`：
 
 ```graphql
 type Query {
@@ -622,3 +639,42 @@ type Product {
 现在运行程序，访问 url `http://localhost:9000/graphiql`，就可以做 GraphQL 查询了。
 
 ![graphiql-product-query](./docs/graphiql-product-query.png)
+
+### 开箱即用的查询能力
+
+到目前为止，我们只编写了少量的代码，通过 Spring Data JPA 和 Spring GraphQL (包括 Querydsl 和 GraphQL Java) 的帮助，事实上我们已经获得了许多数据查询能力。
+
+Spring Data JPA 支持的推断查询列表参考：
+
+* https://docs.spring.io/spring-data/jpa/docs/2.5.6/reference/html/#appendix.query.method.subject
+* https://docs.spring.io/spring-data/jpa/docs/2.5.6/reference/html/#jpa.query-methods.query-creation
+
+Spring GraphQL 开箱即用的查询支持：
+
+### 自定义查询
+
+在 Spring Data JPA 的支持下，实现自定义的 GraphQL 查询支持也能方便。
+
+...
+
+还可以实现更复杂的查询。
+
+## 参考
+
+https://docs.spring.io/spring-data/jdbc/docs/2.2.6/reference/html/#repositories
+
+### 如果只想取 Product 的部分字段，可以参考 Spring Data JPA 的 Projection 能力
+
+https://docs.spring.io/spring-data/jpa/docs/2.5.6/reference/html/#projections
+
+https://docs.spring.io/spring-data/commons/docs/current/reference/html/#projections
+
+注意验证一下，projection 后缩小了 dto 字段数量，这样是否能减少 jpa 生成 sql 时的返回的数据字段数量。
+
+### 如果想层级化 schema 定义，可以参考
+
+* `@SubscriptionMapping`: https://docs.spring.io/spring-graphql/docs/current-SNAPSHOT/reference/html/#controllers-schema-mapping
+* https://www.apollographql.com/docs/apollo-server/schema/schema/#the-subscription-type
+* https://justtech.blog/2018/07/24/graphql-with-spring-query-and-pagination/
+
+参考考虑是类似于在查询时的 `fragment` 指令效果 http://spec.graphql.org/October2021/#sec-Field-Collection
