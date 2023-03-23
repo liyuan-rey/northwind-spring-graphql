@@ -1,0 +1,139 @@
+query q1 {
+  greetings
+
+  findById(id: 1) {
+    id
+    name
+  }
+  existsById(id: 1)
+  getById(id: 2) {
+    id
+    name
+  }
+  findAll {
+    id
+    name
+  }
+  findAllById(ids: [1, 2]) {
+    id
+    name
+  }
+  count
+  categories {
+    id
+    name
+  }
+  category(id: 3) {
+    id
+    name
+  }
+  findByNameOrderByNameDesc(name: "") {
+    id
+    name
+  }
+  
+  
+  findAllProductsByNameLike(name: "%Chai%") {
+    name
+  }
+  findAllProductsByUnitPriceLessThan(unitPrice: 100) {
+    unitPrice
+  }
+  findProductByCategoryId(id: 8) {
+    id
+    name
+    categoryId
+  }
+  findAllProductsByCategoryId(id: 8) {
+    id
+    name
+    categoryId
+  }
+  countProductByCategoryId(id: 1)
+	findProductByName(name: "Chai") {
+    id
+    discontinued
+  }
+  findProductByName2(name: "Chai") {
+    id
+    reorderLevel
+  }
+
+
+  findSupplierByCompanyName(companyName: "Pavlova, Ltd.") {
+    id
+    companyName
+  }
+  findAllSuppliersByProductId(productId: 1) {
+    id
+    companyName
+  }
+
+
+    product(id: 1) {
+    id
+    name
+    category {
+      id
+      name
+    }
+    supplier {
+      id
+      companyName
+    }
+    discontinued
+  }
+  categories {
+    id
+    name
+    products {
+      id
+      name
+      supplier {
+        id
+        companyName
+      }
+      discontinued
+    }
+  }
+}
+
+mutation m {
+  addProduct(input: { name: "ly03", discontinued: "discontinued" }) {
+    id
+    name
+    discontinued
+  }
+  updateProductUnitPrice(id: 1, unitPrice: 100.0) {
+    id
+    name
+    unitPrice
+  }
+}
+
+query q2 {
+  greetings
+
+  categories {
+    id
+    name
+  }
+
+  product(id: 1) {
+    name
+  }
+  findProductByName(name: "Chang") {
+    id
+  }
+
+  Supplier(id: 1) {
+    companyName
+  }
+  findSupplierByCompanyName(companyName: "Tokyo Traders") {
+    id
+  }
+}
+
+query q3 {
+
+}

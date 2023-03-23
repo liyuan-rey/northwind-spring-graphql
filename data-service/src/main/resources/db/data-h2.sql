@@ -1,3 +1,0 @@
---
--- H2 database dump
---
