@@ -677,4 +677,11 @@ https://docs.spring.io/spring-data/commons/docs/current/reference/html/#projecti
 * https://www.apollographql.com/docs/apollo-server/schema/schema/#the-subscription-type
 * https://justtech.blog/2018/07/24/graphql-with-spring-query-and-pagination/
 
-参考考虑是类似于在查询时的 `fragment` 指令效果 http://spec.graphql.org/October2021/#sec-Field-Collection
+参考这个实现：
+
+* https://www.howtographql.com/graphql-java/10-pagination/
+* https://github.com/howtographql/graphql-java/blob/master/src/main/java/com/howtographql/hackernews/Query.java
+
+另外考虑是类似于在查询时的 `fragment` 指令效果 http://spec.graphql.org/October2021/#sec-Field-Collection
+
+http://spec.graphql.org/
